@@ -1,0 +1,55 @@
+[project]
+name = "cloud-cost-control-backend"
+version = "0.1.0"
+description = "Cloud Cost Control Platform - FastAPI backend"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "pydantic>=2.7",
+    "pydantic-settings>=2.3",
+    "sqlalchemy[asyncio]>=2.0",
+    "alembic>=1.13",
+    "psycopg[binary]>=3.1",
+    "asyncpg>=0.29",
+    "redis>=5.0",
+    "celery>=5.4",
+    "boto3>=1.34",
+    "botocore[crt]>=1.34",
+    "httpx>=0.27",
+    "python-jose[cryptography]>=3.3",
+    "groq>=0.9",
+    "svix>=1.24",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.2",
+    "pytest-asyncio>=0.23",
+    "aiosqlite>=0.20",
+    "moto>=5.0",
+    "ruff>=0.5",
+    "mypy>=1.10",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["app*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+# B008: FastAPI's Depends(...) in argument defaults is the intended pattern.
+# UP042: str+Enum is intentional for JSON-serializable role values.
+ignore = ["B008", "UP042"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+testpaths = ["app/tests"]
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"

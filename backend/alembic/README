@@ -1,0 +1,7 @@
+Alembic migrations for the Cloud Cost Control Platform backend.
+
+Generate a migration:
+    alembic revision --autogenerate -m "message"
+
+Apply migrations:
+    alembic upgrade head
