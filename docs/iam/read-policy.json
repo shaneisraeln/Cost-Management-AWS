@@ -1,0 +1,39 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "CostExplorerRead",
+      "Effect": "Allow",
+      "Action": ["ce:GetCostAndUsage"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "ResourceDiscoveryRead",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:DescribeInstances",
+        "ec2:DescribeVolumes",
+        "ec2:DescribeRegions",
+        "ec2:DescribeTags",
+        "s3:ListAllMyBuckets",
+        "s3:GetBucketLocation",
+        "s3:GetBucketTagging",
+        "rds:DescribeDBInstances",
+        "rds:ListTagsForResource"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "ActivityRead",
+      "Effect": "Allow",
+      "Action": ["cloudtrail:LookupEvents", "sts:GetCallerIdentity"],
+      "Resource": "*"
+    },
+    {
+      "Sid": "BedrockUsageMetricsRead",
+      "Effect": "Allow",
+      "Action": ["cloudwatch:ListMetrics", "cloudwatch:GetMetricData"],
+      "Resource": "*"
+    }
+  ]
+}
