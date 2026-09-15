@@ -1,12 +1,17 @@
 # Render blueprint for the Cloud Cost Control backend.
 #
-# Deploys the FastAPI API, a Celery worker, a managed PostgreSQL database, and
-# a managed Redis instance. The Next.js frontend is deployed separately on
-# Vercel (see README).
+# Deploys the FastAPI API, a managed PostgreSQL database, and a managed Redis
+# instance. The Next.js frontend is deployed separately on Vercel (see README).
+#
+# NOTE: Render's FREE plan does not support "worker" services, so the Celery
+# background worker is intentionally omitted here. The app runs syncs
+# synchronously (triggered from the UI), so the worker is optional. To enable
+# background jobs, upgrade the plan and add the worker service shown at the
+# bottom of this file (currently commented out).
 #
 # After the first deploy, set the "sync: false" secrets in the Render dashboard
-# (Environment tab) for each service: Clerk keys, Groq key, and the AWS
-# AssumeRole values. Nothing secret is committed to git.
+# (Environment tab): Clerk keys, Groq key, and the AWS AssumeRole values.
+# Nothing secret is committed to git.
 
 databases:
   - name: ccc-postgres
@@ -76,37 +81,40 @@ services:
       - key: AWS_REGION
         value: us-east-1
 
-  # --- Celery worker (background sync jobs) ---
-  - type: worker
-    name: ccc-worker
-    runtime: python
-    plan: free
-    rootDir: backend
-    buildCommand: pip install -e .
-    startCommand: celery -A app.jobs.celery_app.celery_app worker --loglevel=info
-    envVars:
-      - key: APP_ENV
-        value: production
-      - key: DATABASE_URL
-        fromDatabase:
-          name: ccc-postgres
-          property: connectionString
-      - key: REDIS_URL
-        fromService:
-          type: redis
-          name: ccc-redis
-          property: connectionString
-      - key: CLERK_SECRET_KEY
-        sync: false
-      - key: GROQ_API_KEY
-        sync: false
-      - key: APP_AWS_PRINCIPAL_ARN
-        sync: false
-      - key: EXTERNAL_ID_SECRET
-        sync: false
-      - key: AWS_ACCESS_KEY_ID
-        sync: false
-      - key: AWS_SECRET_ACCESS_KEY
-        sync: false
-      - key: AWS_REGION
-        value: us-east-1
+# --- Celery worker (OPTIONAL — requires a PAID Render plan) ---
+# Render's free plan rejects "worker" services. To run background sync jobs,
+# change the plan below to a paid tier and uncomment this block.
+#
+#  - type: worker
+#    name: ccc-worker
+#    runtime: python
+#    plan: starter
+#    rootDir: backend
+#    buildCommand: pip install -e .
+#    startCommand: celery -A app.jobs.celery_app.celery_app worker --loglevel=info
+#    envVars:
+#      - key: APP_ENV
+#        value: production
+#      - key: DATABASE_URL
+#        fromDatabase:
+#          name: ccc-postgres
+#          property: connectionString
+#      - key: REDIS_URL
+#        fromService:
+#          type: redis
+#          name: ccc-redis
+#          property: connectionString
+#      - key: CLERK_SECRET_KEY
+#        sync: false
+#      - key: GROQ_API_KEY
+#        sync: false
+#      - key: APP_AWS_PRINCIPAL_ARN
+#        sync: false
+#      - key: EXTERNAL_ID_SECRET
+#        sync: false
+#      - key: AWS_ACCESS_KEY_ID
+#        sync: false
+#      - key: AWS_SECRET_ACCESS_KEY
+#        sync: false
+#      - key: AWS_REGION
+#        value: us-east-1
