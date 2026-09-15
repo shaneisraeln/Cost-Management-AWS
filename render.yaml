@@ -1,13 +1,14 @@
 # Render blueprint for the Cloud Cost Control backend.
 #
-# Deploys the FastAPI API, a managed PostgreSQL database, and a managed Redis
-# instance. The Next.js frontend is deployed separately on Vercel (see README).
+# Deploys the FastAPI API and a managed PostgreSQL database. The Next.js
+# frontend is deployed separately on Vercel (see README).
 #
-# NOTE: Render's FREE plan does not support "worker" services, so the Celery
-# background worker is intentionally omitted here. The app runs syncs
-# synchronously (triggered from the UI), so the worker is optional. To enable
-# background jobs, upgrade the plan and add the worker service shown at the
-# bottom of this file (currently commented out).
+# NOTE (free tier): Render's free plan does not support "worker" services and
+# limits you to one free Key Value (Redis) instance per account. Redis is only
+# needed by the optional Celery background worker, so it is omitted here — the
+# API runs syncs synchronously from the UI and does not require Redis. To add
+# background jobs, upgrade the plan, provision a Redis/Key Value instance, set
+# REDIS_URL, and add the worker service (commented at the bottom of this file).
 #
 # After the first deploy, set the "sync: false" secrets in the Render dashboard
 # (Environment tab): Clerk keys, Groq key, and the AWS AssumeRole values.
@@ -20,12 +21,6 @@ databases:
     plan: free
 
 services:
-  # --- Redis (Celery broker + cache) ---
-  - type: redis
-    name: ccc-redis
-    plan: free
-    ipAllowList: []          # only reachable from Render services
-
   # --- FastAPI backend ---
   - type: web
     name: ccc-backend
@@ -45,15 +40,11 @@ services:
         fromDatabase:
           name: ccc-postgres
           property: connectionString
-      - key: REDIS_URL
-        fromService:
-          type: redis
-          name: ccc-redis
-          property: connectionString
-      # Set your deployed frontend origin(s), comma-separated.
+      # Deployed frontend origin(s), comma-separated. Update to your Vercel URL
+      # after the frontend is deployed, then this service redeploys.
       - key: CORS_ALLOWED_ORIGINS
-        sync: false
-      # Clerk (from your Clerk dashboard).
+        value: http://localhost:3000
+      # Clerk (REQUIRED — paste from your Clerk dashboard on first deploy).
       - key: CLERK_SECRET_KEY
         sync: false
       - key: CLERK_PUBLISHABLE_KEY
@@ -62,22 +53,23 @@ services:
         sync: false
       - key: CLERK_ISSUER
         sync: false
-      # Groq (AI explanations; optional — templated fallback works without it).
+      # Groq (optional — templated fallback works without it). Leave empty or
+      # paste a real key later.
       - key: GROQ_API_KEY
-        sync: false
+        value: ""
       - key: GROQ_MODEL
         value: llama-3.3-70b-versatile
-      # AWS cross-account AssumeRole (production).
+      # AWS cross-account AssumeRole (optional until you enable customer
+      # connections). Defaults are harmless placeholders; the app degrades
+      # gracefully. Replace with real values to allow AssumeRole connections.
       - key: APP_AWS_PRINCIPAL_ARN
-        sync: false
+        value: ""
       - key: EXTERNAL_ID_SECRET
-        sync: false
-      # Base AWS credentials the app itself runs as (to call sts:AssumeRole).
-      # Prefer a dedicated, least-privilege IAM user with only sts:AssumeRole.
+        value: change-me-in-dashboard
       - key: AWS_ACCESS_KEY_ID
-        sync: false
+        value: ""
       - key: AWS_SECRET_ACCESS_KEY
-        sync: false
+        value: ""
       - key: AWS_REGION
         value: us-east-1
 

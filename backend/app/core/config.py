@@ -34,7 +34,8 @@ class Settings(BaseSettings):
     # loop). Alembic normalizes this to sync psycopg for migrations.
     database_url: str = "postgresql+asyncpg://ccc:ccc_password@localhost:55432/ccc"
 
-    # Redis
+    # Redis (optional — only used by the Celery background worker). Empty means
+    # not configured; the API runs without it.
     redis_url: str = "redis://localhost:63790/0"
 
     # Clerk
