@@ -1,0 +1,112 @@
+# Render blueprint for the Cloud Cost Control backend.
+#
+# Deploys the FastAPI API, a Celery worker, a managed PostgreSQL database, and
+# a managed Redis instance. The Next.js frontend is deployed separately on
+# Vercel (see README).
+#
+# After the first deploy, set the "sync: false" secrets in the Render dashboard
+# (Environment tab) for each service: Clerk keys, Groq key, and the AWS
+# AssumeRole values. Nothing secret is committed to git.
+
+databases:
+  - name: ccc-postgres
+    databaseName: ccc
+    user: ccc
+    plan: free
+
+services:
+  # --- Redis (Celery broker + cache) ---
+  - type: redis
+    name: ccc-redis
+    plan: free
+    ipAllowList: []          # only reachable from Render services
+
+  # --- FastAPI backend ---
+  - type: web
+    name: ccc-backend
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -e .
+    startCommand: alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /healthz
+    envVars:
+      - key: APP_ENV
+        value: production
+      # SQLAlchemy async driver. Render's connectionString is a standard
+      # postgres URL; the app expects the asyncpg driver, so we set it
+      # explicitly from the DB below (adjust the scheme after copying).
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ccc-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: ccc-redis
+          property: connectionString
+      # Set your deployed frontend origin(s), comma-separated.
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+      # Clerk (from your Clerk dashboard).
+      - key: CLERK_SECRET_KEY
+        sync: false
+      - key: CLERK_PUBLISHABLE_KEY
+        sync: false
+      - key: CLERK_JWKS_URL
+        sync: false
+      - key: CLERK_ISSUER
+        sync: false
+      # Groq (AI explanations; optional — templated fallback works without it).
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GROQ_MODEL
+        value: llama-3.3-70b-versatile
+      # AWS cross-account AssumeRole (production).
+      - key: APP_AWS_PRINCIPAL_ARN
+        sync: false
+      - key: EXTERNAL_ID_SECRET
+        sync: false
+      # Base AWS credentials the app itself runs as (to call sts:AssumeRole).
+      # Prefer a dedicated, least-privilege IAM user with only sts:AssumeRole.
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_REGION
+        value: us-east-1
+
+  # --- Celery worker (background sync jobs) ---
+  - type: worker
+    name: ccc-worker
+    runtime: python
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -e .
+    startCommand: celery -A app.jobs.celery_app.celery_app worker --loglevel=info
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: ccc-postgres
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: ccc-redis
+          property: connectionString
+      - key: CLERK_SECRET_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: APP_AWS_PRINCIPAL_ARN
+        sync: false
+      - key: EXTERNAL_ID_SECRET
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_REGION
+        value: us-east-1

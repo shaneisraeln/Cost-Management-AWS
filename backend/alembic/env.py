@@ -20,12 +20,20 @@ target_metadata = Base.metadata
 settings = get_settings()
 
 # Migrations run synchronously with psycopg (sync mode). Normalize whatever
-# async driver the app uses (asyncpg / psycopg async) to a sync psycopg URL.
+# scheme the environment provides (asyncpg / plain postgres / heroku-style
+# postgres://) to a sync psycopg URL. psycopg accepts libpq query args such as
+# sslmode, so those are preserved for managed databases.
 _url = settings.database_url
+if _url.startswith("postgres://"):
+    _url = _url.replace("postgres://", "postgresql://", 1)
 for _async_driver in ("postgresql+asyncpg", "postgresql+psycopg"):
     if _url.startswith(_async_driver):
         _url = _url.replace(_async_driver, "postgresql+psycopg", 1)
         break
+else:
+    # Bare postgresql:// -> pin the psycopg (v3) driver explicitly.
+    if _url.startswith("postgresql://"):
+        _url = _url.replace("postgresql://", "postgresql+psycopg://", 1)
 SYNC_DATABASE_URL = _url
 
 

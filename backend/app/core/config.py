@@ -20,6 +20,15 @@ class Settings(BaseSettings):
     log_level: str = "INFO"
     api_v1_prefix: str = "/api/v1"
 
+    # Comma-separated list of allowed browser origins for CORS. Defaults to the
+    # local frontend; set to your deployed frontend URL(s) in production, e.g.
+    # "https://your-app.vercel.app,https://your-custom-domain.com".
+    cors_allowed_origins: str = "http://localhost:3000"
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        return [o.strip() for o in self.cors_allowed_origins.split(",") if o.strip()]
+
     # Database
     # App uses the asyncpg driver (Windows-compatible with the default event
     # loop). Alembic normalizes this to sync psycopg for migrations.
@@ -56,6 +65,25 @@ class Settings(BaseSettings):
     # Server-side secret used to derive a stable, per-connection External ID
     # (HMAC). Not an AWS credential; must be set in production.
     external_id_secret: str = "dev-external-id-secret-change-me"
+
+    @property
+    def async_database_url(self) -> str:
+        """DATABASE_URL normalized to the asyncpg driver for the app engine.
+
+        Managed hosts (e.g. Render) hand out a plain ``postgresql://`` URL.
+        The async engine needs the ``postgresql+asyncpg`` driver, and asyncpg
+        does not accept libpq-style query args like ``sslmode``, so we strip
+        them (asyncpg negotiates SSL automatically for managed databases).
+        """
+        url = self.database_url
+        if url.startswith("postgres://"):
+            url = url.replace("postgres://", "postgresql://", 1)
+        if url.startswith("postgresql://"):
+            url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        # Drop query string (e.g. ?sslmode=require) which asyncpg rejects.
+        if "+asyncpg" in url and "?" in url:
+            url = url.split("?", 1)[0]
+        return url
 
     @property
     def is_production(self) -> bool:

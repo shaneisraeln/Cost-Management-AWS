@@ -164,3 +164,57 @@ cross-account connections are unavailable and shows this as a prerequisite (the
 trust policy references the actual principal — never a placeholder). Local
 development continues to work using a host AWS profile (advanced option in the
 wizard) without any of the above.
+
+## Deployment
+
+The app has two deployable pieces:
+
+- **Frontend** (Next.js) → **Vercel**.
+- **Backend** (FastAPI + PostgreSQL + Redis + Celery worker) → **Render**
+  (Vercel's serverless model can't host a persistent FastAPI server, Postgres,
+  Redis, or a background worker).
+
+### Backend on Render (do this first — the frontend needs its URL)
+
+A blueprint is provided at [`render.yaml`](./render.yaml). It provisions
+Postgres, Redis, the FastAPI web service, and the Celery worker.
+
+1. In Render: **New → Blueprint**, connect this repo, and apply `render.yaml`.
+2. Set the secret env vars (marked `sync: false`) in the dashboard for the
+   `ccc-backend` (and `ccc-worker`) services:
+   - `CORS_ALLOWED_ORIGINS` — your Vercel URL, e.g.
+     `https://your-app.vercel.app` (comma-separate multiple origins)
+   - `CLERK_SECRET_KEY`, `CLERK_PUBLISHABLE_KEY`, `CLERK_JWKS_URL`,
+     `CLERK_ISSUER`
+   - `GROQ_API_KEY` (optional; templated fallback works without it)
+   - `APP_AWS_PRINCIPAL_ARN`, `EXTERNAL_ID_SECRET` (for cross-account AssumeRole)
+   - `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY` — a **least-privilege** IAM
+     user whose only permission is `sts:AssumeRole`, used as the app's base
+     credentials to assume customer roles.
+3. `DATABASE_URL` and `REDIS_URL` are wired automatically from the managed
+   Postgres/Redis. The app normalizes the Postgres URL to the async driver at
+   runtime; migrations run on deploy via `alembic upgrade head`.
+4. Note the backend URL, e.g. `https://ccc-backend.onrender.com`.
+
+### Frontend on Vercel
+
+1. In Vercel: **Add New → Project**, import this repo.
+2. **Set Root Directory to `frontend`** (critical — the repo root holds both
+   backend and frontend).
+3. Framework is auto-detected as Next.js.
+4. Add environment variables:
+   - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY`, `CLERK_SECRET_KEY`
+   - `NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in`,
+     `NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up`
+   - `NEXT_PUBLIC_API_BASE_URL` = your backend URL + `/api/v1`, e.g.
+     `https://ccc-backend.onrender.com/api/v1`
+5. Deploy. Vercel returns a URL like `https://your-app.vercel.app`.
+
+### Wire the two together
+
+- Put the Vercel URL into the backend's `CORS_ALLOWED_ORIGINS` on Render.
+- In the **Clerk dashboard**, add the Vercel URL as an allowed origin/redirect;
+  switch to Clerk **production** keys for a real public deployment.
+
+Secrets are never committed — only `.env.example` templates and the Render
+blueprint (with `sync: false` placeholders) live in the repo.
